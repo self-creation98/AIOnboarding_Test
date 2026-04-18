@@ -235,8 +235,6 @@ async def webhook_new_employee(body: NewEmployeeWebhook):
             insert_data["personal_email"] = data.personal_email
         if data.manager_id:
             insert_data["manager_id"] = data.manager_id
-        if data.location:
-            insert_data["location"] = data.location
 
         emp_result = supabase.table("employees").insert(insert_data).execute()
 
@@ -654,7 +652,7 @@ async def webhook_employee_updated(body: EmployeeUpdatedWebhook):
         # ─── Allowed fields to update on employee record ───
         ALLOWED_FIELDS = {
             "full_name", "email", "role", "department", "seniority",
-            "start_date", "manager_id", "location", "personal_email",
+            "start_date", "manager_id", "personal_email",
         }
 
         update_data = {}
