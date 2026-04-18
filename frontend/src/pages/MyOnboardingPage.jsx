@@ -4,7 +4,10 @@ import { useToast } from '../components/Toast';
 
 export default function MyOnboardingPage() {
   const [data, setData] = useState(null);
+  const [preboarding, setPreboarding] = useState(null);
+  const [bankInfo, setBankInfo] = useState({ bankName: '', accountNumber: '' });
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const { showToast } = useToast();
   const user = getUser();
 
@@ -20,6 +23,11 @@ export default function MyOnboardingPage() {
         setData(res.data);
       } else {
         showToast(res.error, 'error');
+      }
+
+      const pbRes = await api.get(`/api/preboarding/${user.id}`);
+      if (pbRes.success) {
+        setPreboarding(pbRes.data);
       }
     } catch (err) {
       showToast(err.message, 'error');
@@ -44,11 +52,39 @@ export default function MyOnboardingPage() {
     }
   };
 
+  const handleSubmitBankInfo = async (e) => {
+    e.preventDefault();
+    if (!bankInfo.bankName || !bankInfo.accountNumber) return;
+    setUploading(true);
+    try {
+      const blob = new Blob([JSON.stringify(bankInfo, null, 2)], { type: 'application/json' });
+      const formData = new FormData();
+      formData.append('document_type', 'so_tai_khoan');
+      formData.append('file', blob, 'bank_info.json');
+
+      const res = await api(`/api/preboarding/${user.id}/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      if (res.success) {
+        showToast('Đã ghi nhận thông tin ngân hàng!', 'success');
+        fetchMyData(); // Refresh to update doc status
+      } else {
+        showToast(res.error, 'error');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (loading) return <div className="p-8">Đang tải dữ liệu...</div>;
   if (!data) return <div className="p-8">Không tìm thấy thông tin onboarding.</div>;
 
   const plan = data.onboarding_plan;
   const items = data.checklist || [];
+  const bankDoc = preboarding?.documents?.find(d => d.document_type === 'so_tai_khoan');
 
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-8">
@@ -76,6 +112,43 @@ export default function MyOnboardingPage() {
           <div><span className="font-medium text-gray-900">{plan?.total_items || 0}</span> tổng cộng</div>
         </div>
       </div>
+
+      {/* Thông tin ngân hàng */}
+      {bankDoc && (
+        <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm">
+          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            💳 Thông tin Ngân hàng (Nhận lương)
+          </h2>
+          {bankDoc.status === 'missing' ? (
+            <form onSubmit={handleSubmitBankInfo} className="space-y-4">
+              <p className="text-sm text-gray-600">Vui lòng cung cấp thông tin tài khoản để HR tiến hành thủ tục trả lương cho bạn.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Tên Ngân hàng</label>
+                  <input required className="w-full border border-gray-300 rounded p-2 focus:ring focus:ring-primary-200" 
+                    placeholder="VD: Vietcombank chi nhánh HCM" value={bankInfo.bankName} onChange={e => setBankInfo(p => ({...p, bankName: e.target.value}))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Số tài khoản</label>
+                  <input required className="w-full border border-gray-300 rounded p-2 focus:ring focus:ring-primary-200" 
+                    placeholder="VD: 0123456789" value={bankInfo.accountNumber} onChange={e => setBankInfo(p => ({...p, accountNumber: e.target.value}))} />
+                </div>
+              </div>
+              <button disabled={uploading} type="submit" className="bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded transition-colors disabled:opacity-50">
+                {uploading ? 'Đang gửi...' : 'Gửi thông tin'}
+              </button>
+            </form>
+          ) : (
+            <div className="bg-green-50 text-green-700 p-4 rounded flex items-center gap-3">
+              <span className="text-xl">✅</span>
+              <div>
+                <p className="font-semibold">Đã cập nhật thông tin thành công!</p>
+                <p className="text-sm">Bộ phận nhân sự đã nhận được thông tin tài khoản ngân hàng của bạn.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Danh sách nhiệm vụ */}
       <div className="space-y-4">
