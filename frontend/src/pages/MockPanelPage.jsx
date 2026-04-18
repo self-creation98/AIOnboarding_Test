@@ -12,7 +12,7 @@ export default function MockPanelPage() {
   const [hris, setHris] = useState({
     full_name: 'Nguyễn Văn An', email: 'an.nguyen@company.com',
     role: 'Software Engineer', department: 'Engineering',
-    start_date: '2026-05-20', seniority_level: 'junior', location: 'HCM',
+    start_date: '2026-05-20', seniority: 'junior', location: 'HCM',
   });
 
   // IT form
@@ -67,12 +67,12 @@ export default function MockPanelPage() {
             <div className="form-group"><label className="form-label">Ngày bắt đầu</label>
               <input className="form-input" type="date" value={hris.start_date} onChange={e => setHris(p => ({ ...p, start_date: e.target.value }))} /></div>
             <div className="form-group"><label className="form-label">Cấp bậc</label>
-              <select className="form-select" value={hris.seniority_level} onChange={e => setHris(p => ({ ...p, seniority_level: e.target.value }))}>
+              <select className="form-select" value={hris.seniority} onChange={e => setHris(p => ({ ...p, seniority: e.target.value }))}>
                 <option value="junior">Junior</option><option value="senior">Senior</option><option value="intern">Intern</option>
               </select></div>
           </div>
           <button className="btn btn-primary" disabled={loadings.hris}
-            onClick={() => fire('hris', '/api/webhooks/hris/new-employee', hris)}>
+            onClick={() => fire('hris', '/api/webhooks/hris/new-employee', { event: 'employee.created', data: hris })}>
             {loadings.hris ? '⏳...' : '🚀 Gửi Webhook'}
           </button>
           {responses.hris && <div className="response-box">{responses.hris}</div>}
@@ -92,7 +92,7 @@ export default function MockPanelPage() {
               <option value="vpn_access">VPN Access</option><option value="software_install">Software Install</option>
             </select></div>
           <button className="btn btn-success" disabled={loadings.it || !it.employee_id}
-            onClick={() => fire('it', '/api/webhooks/it/ticket-resolved', { ...it, ticket_id: `IT-${Date.now()}` })}>
+            onClick={() => fire('it', '/api/webhooks/it/ticket-resolved', { event: 'ticket.resolved', data: { ...it, ticket_id: `IT-${Date.now()}` } })}>
             {loadings.it ? '⏳...' : '✅ Resolve Ticket'}
           </button>
           {responses.it && <div className="response-box">{responses.it}</div>}
@@ -113,7 +113,7 @@ export default function MockPanelPage() {
               <input className="form-input" type="number" value={lms.score} onChange={e => setLms(p => ({ ...p, score: +e.target.value }))} /></div>
           </div>
           <button className="btn btn-primary" style={{ background: 'var(--yellow)', boxShadow: 'none' }} disabled={loadings.lms || !lms.employee_id}
-            onClick={() => fire('lms', '/api/webhooks/lms/course-completed', { ...lms, course_id: 'SEC-101', completed_at: new Date().toISOString() })}>
+            onClick={() => fire('lms', '/api/webhooks/lms/course-completed', { event: 'course.completed', data: { ...lms, course_id: 'SEC-101', completed_at: new Date().toISOString() } })}>
             {loadings.lms ? '⏳...' : '📚 Hoàn thành khóa học'}
           </button>
           {responses.lms && <div className="response-box">{responses.lms}</div>}
