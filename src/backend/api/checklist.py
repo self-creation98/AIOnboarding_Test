@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user
+from src.backend.api.deps import get_current_active_user, RequireRole
 from src.backend.schemas import UserInfo
 from src.backend.services.event_dispatcher import fire_event
 from src.backend.services.stakeholder_notifier import notify_stakeholders
@@ -168,7 +168,7 @@ def _build_checklist(role: str, department: str, seniority: str) -> list[dict]:
 )
 async def generate_checklist(
     body: GenerateRequest,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """POST /api/checklist/generate — tao checklist 3-layer."""
     try:
@@ -299,6 +299,10 @@ async def get_plan(
 
         plan = plan_result.data[0]
 
+        if current_user.vai_tro == "nhan_vien_moi" and current_user.id != plan["employee_id"]:
+            from fastapi import HTTPException, status
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
         # Items
         items_result = (
             supabase.table("checklist_items")
@@ -331,7 +335,7 @@ async def get_plan(
 async def approve_plan(
     plan_id: str,
     body: ApproveRequest,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """POST /api/checklist/{plan_id}/approve — duyet plan."""
     try:
@@ -580,6 +584,9 @@ async def get_employee_checklist(
     current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/employees/{employee_id}/checklist — checklist theo employee."""
+    if current_user.vai_tro == "nhan_vien_moi" and current_user.id != employee_id:
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     try:
         supabase = get_supabase()
 
@@ -629,7 +636,7 @@ async def get_employee_checklist(
 )
 async def delete_plan(
     plan_id: str,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
 ):
     """DELETE /api/checklist/{plan_id} — xoa plan + items."""
     try:

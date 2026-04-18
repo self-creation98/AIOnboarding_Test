@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user
+from src.backend.api.deps import get_current_active_user, RequireRole
 from src.backend.schemas import UserInfo
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ def _err(msg: str, status_code: int = 400):
 )
 async def assign_buddy(
     body: AssignBuddyRequest,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """POST /api/actions/assign-buddy — nhac manager assign buddy."""
     try:
@@ -158,7 +158,7 @@ async def assign_buddy(
 )
 async def escalate_it(
     body: EscalateItRequest,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """POST /api/actions/escalate-it — escalate IT tasks."""
     try:
@@ -238,7 +238,7 @@ async def escalate_it(
 )
 async def schedule_checkin(
     body: ScheduleCheckinRequest,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """POST /api/actions/schedule-checkin — dat lich check-in."""
     try:
@@ -320,7 +320,7 @@ async def schedule_checkin(
 )
 async def send_reminder(
     body: SendReminderRequest,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """POST /api/actions/send-reminder — gui nhac nho NV."""
     try:
@@ -410,7 +410,7 @@ async def send_reminder(
 async def get_action_history(
     employee_id: str | None = Query(default=None, description="Filter theo employee"),
     action_type: str | None = Query(default=None, description="Filter: assign_buddy, escalate_it, schedule_checkin, send_reminder"),
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """GET /api/actions/history — lich su actions."""
     try:

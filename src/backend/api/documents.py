@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user
+from src.backend.api.deps import get_current_active_user, RequireRole
 from src.backend.schemas import UserInfo
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ def _err(msg: str, status_code: int = 400):
 )
 async def upload_document(
     body: DocumentUpload,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
 ):
     """POST /api/documents/upload — upload tai lieu text."""
     try:
@@ -107,7 +107,7 @@ async def upload_document(
     description="Lay danh sach tat ca tai lieu, order by created_at DESC.",
 )
 async def list_documents(
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """GET /api/documents — danh sach tai lieu."""
     try:
@@ -137,7 +137,7 @@ async def list_documents(
 )
 async def get_document(
     document_id: str,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """GET /api/documents/{id} — chi tiet + chunks count."""
     try:
@@ -183,7 +183,7 @@ async def get_document(
 )
 async def delete_document(
     document_id: str,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
 ):
     """DELETE /api/documents/{id} — xoa document + chunks."""
     try:

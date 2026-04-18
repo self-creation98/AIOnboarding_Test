@@ -14,6 +14,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 from src.config import LOG_LEVEL
 from src.backend.api.auth import router as auth_router
@@ -131,3 +134,22 @@ async def health_check():
         "service": "AI Onboarding Backend",
         "version": "0.1.0",
     }
+
+
+# ─── Serve Frontend SPA ───
+dist_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/dist"))
+if os.path.isdir(dist_path):
+    assets_path = os.path.join(dist_path, "assets")
+    if os.path.isdir(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_frontend(full_path: str):
+        if full_path.startswith("api/"):
+            return {"error": "Not found"}
+        
+        file_path = os.path.join(dist_path, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+            
+        return FileResponse(os.path.join(dist_path, "index.html"))

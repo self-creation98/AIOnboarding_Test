@@ -22,7 +22,7 @@ export default function LoginPage() {
       const data = await login(email, password);
       if (data.access_token) {
         setAuth(data.access_token, data.user || { email, vai_tro: 'hr_admin', full_name: email.split('@')[0] });
-        navigate('/');
+        window.location.href = '/';
       } else {
         setError(data.detail || data.error || 'Đăng nhập thất bại');
       }

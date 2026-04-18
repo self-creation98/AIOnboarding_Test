@@ -64,6 +64,9 @@ async def send_message(
     current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/chat — gui tin nhan, nhan phan hoi."""
+    if current_user.vai_tro == "nhan_vien_moi" and current_user.id != body.employee_id:
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     try:
         supabase = get_supabase()
 
@@ -174,6 +177,9 @@ async def get_chat_history(
     current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/chat/history/{employee_id} — lich su chat."""
+    if current_user.vai_tro == "nhan_vien_moi" and current_user.id != employee_id:
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     try:
         supabase = get_supabase()
 

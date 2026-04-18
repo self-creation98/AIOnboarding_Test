@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user
+from src.backend.api.deps import get_current_active_user, RequireRole
 from src.backend.schemas import UserInfo
 from src.backend.services.event_dispatcher import fire_event
 
@@ -49,7 +49,7 @@ def _err(msg: str, status_code: int = 400):
 
 
 @router.get("/overview", summary="Tong quan HR dashboard")
-async def overview(current_user: UserInfo = Depends(get_current_active_user)):
+async def overview(current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"]))):
     """GET /api/analytics/overview"""
     try:
         supabase = get_supabase()
@@ -114,7 +114,7 @@ async def overview(current_user: UserInfo = Depends(get_current_active_user)):
 async def bottlenecks(
     min_affected: int = Query(default=2),
     department: str | None = Query(default=None),
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """GET /api/analytics/bottlenecks"""
     try:
@@ -177,7 +177,7 @@ async def bottlenecks(
 
 
 @router.get("/content-gaps", summary="Content gap detection")
-async def content_gaps(current_user: UserInfo = Depends(get_current_active_user)):
+async def content_gaps(current_user: UserInfo = Depends(RequireRole(["hr_admin"]))):
     """GET /api/analytics/content-gaps"""
     try:
         supabase = get_supabase()
@@ -218,7 +218,7 @@ async def content_gaps(current_user: UserInfo = Depends(get_current_active_user)
 
 
 @router.get("/chatbot-stats", summary="Thong ke chatbot")
-async def chatbot_stats(current_user: UserInfo = Depends(get_current_active_user)):
+async def chatbot_stats(current_user: UserInfo = Depends(RequireRole(["hr_admin"]))):
     """GET /api/analytics/chatbot-stats"""
     try:
         supabase = get_supabase()
@@ -256,7 +256,7 @@ async def chatbot_stats(current_user: UserInfo = Depends(get_current_active_user
 @router.get("/employee/{employee_id}", summary="Tong hop data 1 NV")
 async def employee_analytics(
     employee_id: str,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """GET /api/analytics/employee/{employee_id}"""
     try:
@@ -361,7 +361,7 @@ async def employee_analytics(
 @router.post("/copilot", summary="AI Copilot tom tat")
 async def copilot_summary(
     body: CopilotRequest,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """POST /api/analytics/copilot — rule-based copilot (TODO: noi AI)."""
     try:
@@ -447,7 +447,7 @@ async def copilot_summary(
 
 @router.post("/recalculate-health", summary="Tinh lai health_score")
 async def recalculate_health(
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
 ):
     """POST /api/analytics/recalculate-health"""
     try:

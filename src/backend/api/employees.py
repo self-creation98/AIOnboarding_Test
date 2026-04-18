@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, EmailStr, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user
+from src.backend.api.deps import get_current_active_user, RequireRole
 from src.backend.schemas import UserInfo
 
 logger = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ def _err(msg: str, status_code: int = 400):
 )
 async def create_employee(
     body: EmployeeCreate,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
 ):
     """POST /api/employees — tao nhan vien moi."""
     try:
@@ -182,7 +182,7 @@ async def list_employees(
     department: str | None = Query(default=None, description="Filter theo department"),
     onboarding_status: str | None = Query(default=None, description="Filter: pre_boarding | in_progress | completed | terminated"),
     health_score: str | None = Query(default=None, description="Filter: green | yellow | red"),
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """GET /api/employees — danh sach co filter."""
     try:
@@ -244,6 +244,12 @@ async def get_employee(
     current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/employees/{id} — chi tiet + checklist + documents."""
+    if current_user.vai_tro == "nhan_vien_moi" and current_user.id != employee_id:
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn chỉ được xem thông tin của chính mình"
+        )
     try:
         supabase = get_supabase()
 
@@ -306,7 +312,7 @@ async def get_employee(
 async def update_employee(
     employee_id: str,
     body: EmployeeUpdate,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
 ):
     """PATCH /api/employees/{id} — partial update."""
     try:
@@ -343,7 +349,7 @@ async def update_employee(
 )
 async def delete_employee(
     employee_id: str,
-    current_user: UserInfo = Depends(get_current_active_user),
+    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
 ):
     """DELETE /api/employees/{id} — soft delete."""
     try:

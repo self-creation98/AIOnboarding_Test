@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { clearAuth, getUser } from '../api/client';
 
-const NAV_ITEMS = [
+const NAV_ITEMS_HR = [
   { path: '/', icon: '📊', label: 'Dashboard' },
   { path: '/mock-panel', icon: '🎮', label: 'Mock Panel' },
   { path: '/documents', icon: '📄', label: 'Knowledge Base' },
@@ -9,9 +9,16 @@ const NAV_ITEMS = [
   { path: '/stakeholder-tasks', icon: '📋', label: 'Tasks' },
 ];
 
+const NAV_ITEMS_EMP = [
+  { path: '/', icon: '👋', label: 'My Onboarding' },
+  { path: '/chat', icon: '💬', label: 'AI Chat' },
+];
+
 export default function Sidebar() {
   const navigate = useNavigate();
   const user = getUser();
+  const role = user?.vai_tro || 'hr_admin';
+  const NAV_ITEMS = role === 'nhan_vien_moi' ? NAV_ITEMS_EMP : NAV_ITEMS_HR;
 
   const handleLogout = () => {
     clearAuth();

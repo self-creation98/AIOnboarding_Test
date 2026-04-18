@@ -3,7 +3,7 @@
  * Connects to FastAPI backend at localhost:8000.
  */
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:8000';
 
 export function getToken() {
   return localStorage.getItem('access_token');

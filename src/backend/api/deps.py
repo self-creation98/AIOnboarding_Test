@@ -104,3 +104,24 @@ async def get_current_active_user(
     """
     # Co the them check: employee status, probation, etc.
     return current_user
+
+
+class RequireRole:
+    """
+    Phân quyền (RBAC) dependency.
+    Kiểm tra xem user hiện tại có role nằm trong danh sách cho phép không.
+
+    Usage:
+        @app.get("/api/admin", dependencies=[Depends(RequireRole(["hr_admin", "it_admin"]))])
+    """
+    def __init__(self, allowed_roles: list[str]):
+        self.allowed_roles = allowed_roles
+
+    def __call__(self, current_user: UserInfo = Depends(get_current_active_user)) -> UserInfo:
+        if current_user.vai_tro not in self.allowed_roles:
+            logger.warning(f"Access denied for user {current_user.email} with role {current_user.vai_tro}. Allowed: {self.allowed_roles}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Quyền truy cập bị từ chối. Cần quyền: {', '.join(self.allowed_roles)}",
+            )
+        return current_user
