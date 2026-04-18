@@ -543,20 +543,44 @@ async def webhook_ticket_resolved(body: TicketResolvedWebhook):
             checklist_items_updated += 1
             plan_id = item["plan_id"]
 
-        # (c) Tính lại completion_percentage
+        # (c) Auto-create Supabase Auth User so employee can log in
+        auth_created = False
+        emp_result = supabase.table("employees").select("email").eq("id", data.employee_id).limit(1).execute()
+        if emp_result.data:
+            employee_email = emp_result.data[0]["email"]
+            try:
+                supabase.auth.admin.create_user({
+                    "email": employee_email,
+                    "password": "123456",
+                    "email_confirm": True
+                })
+                auth_created = True
+                actions_taken_log = f"Auth user {employee_email} created."
+            except Exception as e:
+                # Bỏ qua nếu user đã tồn tại
+                if "already registered" in str(e).lower() or "already exists" in str(e).lower():
+                    auth_created = True
+                    actions_taken_log = f"Auth user {employee_email} already exists."
+                else:
+                    actions_taken_log = f"Auth user creation failed: {e}"
+        else:
+            actions_taken_log = "Employee not found for auth creation."
+
+        # (d) Tính lại completion_percentage
         new_percentage = 0.0
         if plan_id:
             new_percentage = _recalc_completion(supabase, plan_id)
 
-        # (d) Log webhook
-        _log_webhook(supabase, "in", "ticket.resolved", request_body, success=True)
+        # (e) Log webhook
+        _log_webhook(supabase, "in", "ticket.resolved", request_body, success=True, error_message=actions_taken_log)
 
         return _ok({
             "employee_id": data.employee_id,
             "stakeholder_tasks_completed": stakeholder_tasks_completed,
             "checklist_items_updated": checklist_items_updated,
             "new_completion_percentage": new_percentage,
-            "message": "Đã cập nhật tasks IT",
+            "auth_account_created": auth_created,
+            "message": "Đã cập nhật tasks IT và cấp quyền đăng nhập",
         })
 
     except Exception as e:
