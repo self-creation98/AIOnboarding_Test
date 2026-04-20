@@ -8,9 +8,9 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-[#faf9fb]">
       <Sidebar />
-      <main className="flex-1 ml-[220px] px-8 py-6 max-w-[1200px]">
+      <main className="flex-1 ml-16 px-8 py-6 max-w-[1280px]">
         <Outlet />
       </main>
     </div>

@@ -35,7 +35,7 @@ export default function MockPanelPage() {
     setLoadings(p => ({ ...p, [key]: false }));
   }
 
-  const Label = ({ children }) => <label className="text-sm font-medium text-zinc-600 mb-1.5 block">{children}</label>;
+  const Label = ({ children }) => <label className="text-sm font-medium text-[#6e6880] mb-1.5 block">{children}</label>;
 
   return (
     <PageTransition>
@@ -43,8 +43,8 @@ export default function MockPanelPage() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* HRIS */}
         <AnimatedItem>
-          <Card className="border-l-2 border-l-zinc-900">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4" /> HRIS: Tạo Nhân Viên Mới</CardTitle></CardHeader>
+          <Card className="border-l-[3px] border-l-primary-500">
+            <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4 text-primary-500" /> HRIS: Tạo Nhân Viên Mới</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Họ tên</Label><Input value={hris.full_name} onChange={e => setHris(p => ({ ...p, full_name: e.target.value }))} /></div>
@@ -61,30 +61,30 @@ export default function MockPanelPage() {
               <Button disabled={loadings.hris} onClick={() => fire('hris', '/api/webhooks/hris/new-employee', { event: 'employee.created', data: hris })}>
                 {loadings.hris ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : <><Send className="h-4 w-4" /> Gửi Webhook</>}
               </Button>
-              {responses.hris && <pre className="mt-3 rounded-md bg-zinc-50 border border-zinc-200 p-3 text-xs text-zinc-600 font-mono max-h-40 overflow-auto">{responses.hris}</pre>}
+              {responses.hris && <pre className="mt-3 rounded-xl bg-[#faf9fb] border border-[#eeedf0] p-3 text-xs text-[#6e6880] font-mono max-h-40 overflow-auto">{responses.hris}</pre>}
             </CardContent>
           </Card>
         </AnimatedItem>
 
         {/* IT */}
         <AnimatedItem>
-          <Card className="border-l-2 border-l-emerald-500">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Wrench className="h-4 w-4" /> IT: Resolve Ticket</CardTitle></CardHeader>
+          <Card className="border-l-[3px] border-l-emerald-400">
+            <CardHeader><CardTitle className="flex items-center gap-2"><Wrench className="h-4 w-4 text-emerald-500" /> IT: Resolve Ticket</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div><Label>Nhân viên</Label><Select value={it.employee_id} onChange={e => setIt(p => ({ ...p, employee_id: e.target.value }))}><option value="">-- Chọn NV --</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</Select></div>
               <div><Label>Task Type</Label><Select value={it.task_type} onChange={e => setIt(p => ({ ...p, task_type: e.target.value }))}><option value="email_setup">Email Setup</option><option value="laptop_setup">Laptop Setup</option><option value="vpn_access">VPN Access</option><option value="software_install">Software Install</option></Select></div>
               <Button variant="success" disabled={loadings.it || !it.employee_id} onClick={() => fire('it', '/api/webhooks/it/ticket-resolved', { event: 'ticket.resolved', data: { ...it, ticket_id: `IT-${Date.now()}` } })}>
                 {loadings.it ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : <><Send className="h-4 w-4" /> Resolve Ticket</>}
               </Button>
-              {responses.it && <pre className="mt-3 rounded-md bg-zinc-50 border border-zinc-200 p-3 text-xs text-zinc-600 font-mono max-h-40 overflow-auto">{responses.it}</pre>}
+              {responses.it && <pre className="mt-3 rounded-xl bg-[#faf9fb] border border-[#eeedf0] p-3 text-xs text-[#6e6880] font-mono max-h-40 overflow-auto">{responses.it}</pre>}
             </CardContent>
           </Card>
         </AnimatedItem>
 
         {/* LMS */}
         <AnimatedItem>
-          <Card className="border-l-2 border-l-amber-400">
-            <CardHeader><CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4" /> LMS: Course Completed</CardTitle></CardHeader>
+          <Card className="border-l-[3px] border-l-amber-400">
+            <CardHeader><CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4 text-amber-500" /> LMS: Course Completed</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div><Label>Nhân viên</Label><Select value={lms.employee_id} onChange={e => setLms(p => ({ ...p, employee_id: e.target.value }))}><option value="">-- Chọn NV --</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</Select></div>
               <div className="grid grid-cols-2 gap-3">
@@ -94,7 +94,7 @@ export default function MockPanelPage() {
               <Button disabled={loadings.lms || !lms.employee_id} onClick={() => fire('lms', '/api/webhooks/lms/course-completed', { event: 'course.completed', data: { ...lms, course_id: 'SEC-101', completed_at: new Date().toISOString() } })}>
                 {loadings.lms ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : <><Send className="h-4 w-4" /> Hoàn thành khóa học</>}
               </Button>
-              {responses.lms && <pre className="mt-3 rounded-md bg-zinc-50 border border-zinc-200 p-3 text-xs text-zinc-600 font-mono max-h-40 overflow-auto">{responses.lms}</pre>}
+              {responses.lms && <pre className="mt-3 rounded-xl bg-[#faf9fb] border border-[#eeedf0] p-3 text-xs text-[#6e6880] font-mono max-h-40 overflow-auto">{responses.lms}</pre>}
             </CardContent>
           </Card>
         </AnimatedItem>
