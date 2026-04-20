@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react';
-import { api } from '../api/client';
-import { useToast } from '../components/Toast';
+import { api } from '@/api/client';
+import { useToast } from '@/components/Toast';
+import Header from '@/components/Header';
+import { PageTransition, AnimatedItem } from '@/components/PageTransition';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, X, Loader2, Save, FileText } from 'lucide-react';
 
 export default function DocumentsPage() {
   const toast = useToast();
@@ -14,10 +26,7 @@ export default function DocumentsPage() {
 
   async function loadDocs() {
     setLoading(true);
-    try {
-      const r = await api('/api/documents');
-      if (r.success) setDocs(r.data || []);
-    } catch (e) { console.error(e); }
+    try { const r = await api('/api/documents'); if (r.success) setDocs(r.data || []); } catch (e) { console.error(e); }
     setLoading(false);
   }
 
@@ -27,76 +36,86 @@ export default function DocumentsPage() {
     try {
       const r = await api('/api/documents/upload', {
         method: 'POST',
-        body: JSON.stringify({ ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean) }),
+        body: JSON.stringify({ title: form.title, content: form.content, category: form.category, department_tags: form.tags.split(',').map(t => t.trim()).filter(Boolean) }),
       });
-      if (r.success) {
-        toast('✅ Document uploaded!', 'success');
-        setShowForm(false);
-        setForm({ title: '', content: '', category: 'policy', tags: '' });
-        loadDocs();
-      } else {
-        toast(`❌ ${r.error}`, 'error');
-      }
+      if (r.success) { toast('✅ Document uploaded!', 'success'); setShowForm(false); setForm({ title: '', content: '', category: 'policy', tags: '' }); loadDocs(); }
+      else toast(`❌ ${r.error}`, 'error');
     } catch (e) { toast('❌ Lỗi kết nối', 'error'); }
     setSaving(false);
   }
 
-  if (loading) return <div className="loading"><div className="spinner" />Đang tải...</div>;
+  if (loading) return (
+    <div><Header title="Knowledge Base" subtitle="Quản lý tài liệu cho RAG" /><Skeleton className="h-64 rounded-2xl" /></div>
+  );
 
   return (
-    <div>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div><h1>📄 Knowledge Base</h1><p>Quản lý tài liệu cho RAG</p></div>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? '✕ Đóng' : '+ Thêm tài liệu'}
-        </button>
-      </div>
-
-      {showForm && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <form onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group"><label className="form-label">Tiêu đề</label>
-                <input className="form-input" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} required /></div>
-              <div className="form-group"><label className="form-label">Danh mục</label>
-                <select className="form-select" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
-                  <option value="policy">Chính sách</option><option value="procedure">Quy trình</option>
-                  <option value="faq">FAQ</option><option value="guide">Hướng dẫn</option><option value="benefit">Phúc lợi</option>
-                </select></div>
-            </div>
-            <div className="form-group"><label className="form-label">Nội dung</label>
-              <textarea className="form-textarea" rows={6} value={form.content}
-                onChange={e => setForm(p => ({ ...p, content: e.target.value }))} required
-                placeholder="Nhập nội dung tài liệu..." /></div>
-            <div className="form-group"><label className="form-label">Tags (phân cách bằng dấu phẩy)</label>
-              <input className="form-input" value={form.tags} onChange={e => setForm(p => ({ ...p, tags: e.target.value }))}
-                placeholder="nghỉ phép, chính sách, hr" /></div>
-            <button className="btn btn-primary" disabled={saving} type="submit">
-              {saving ? '⏳...' : '💾 Lưu tài liệu'}
-            </button>
-          </form>
+    <PageTransition>
+      <AnimatedItem>
+        <div className="flex items-center justify-between mb-8">
+          <Header title="Knowledge Base" subtitle="Quản lý tài liệu cho RAG" />
+          <Button onClick={() => setShowForm(!showForm)}>
+            {showForm ? <><X className="h-4 w-4" /> Đóng</> : <><Plus className="h-4 w-4" /> Thêm tài liệu</>}
+          </Button>
         </div>
-      )}
+      </AnimatedItem>
 
-      <div className="card">
-        {docs.length === 0 ? (
-          <div className="empty-state"><div className="icon">📄</div><h3>Chưa có tài liệu</h3><p>Thêm tài liệu để chatbot có thể trả lời</p></div>
-        ) : (
-          <table className="data-table">
-            <thead><tr><th>Tiêu đề</th><th>Danh mục</th><th>Tags</th><th>Ngày tạo</th></tr></thead>
-            <tbody>
-              {docs.map(d => (
-                <tr key={d.id}>
-                  <td style={{ fontWeight: 500 }}>{d.title}</td>
-                  <td><span className="badge purple">{d.category}</span></td>
-                  <td>{(d.tags || []).map(t => <span key={t} className="badge gray" style={{ marginRight: 4 }}>{t}</span>)}</td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{d.created_at ? new Date(d.created_at).toLocaleDateString('vi') : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <AnimatePresence>
+        {showForm && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25 }}>
+            <AnimatedItem>
+              <Card className="mb-5">
+                <CardContent className="pt-6">
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><label className="text-xs font-semibold text-slate-400 mb-1.5 block">Tiêu đề</label><Input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} required /></div>
+                      <div><label className="text-xs font-semibold text-slate-400 mb-1.5 block">Danh mục</label>
+                        <Select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
+                          <option value="policy">Chính sách</option><option value="procedure">Quy trình</option>
+                          <option value="faq">FAQ</option><option value="guide">Hướng dẫn</option><option value="benefit">Phúc lợi</option>
+                        </Select></div>
+                    </div>
+                    <div><label className="text-xs font-semibold text-slate-400 mb-1.5 block">Nội dung</label>
+                      <Textarea rows={5} value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} required placeholder="Nhập nội dung tài liệu..." /></div>
+                    <div><label className="text-xs font-semibold text-slate-400 mb-1.5 block">Tags (phân cách bằng dấu phẩy)</label>
+                      <Input value={form.tags} onChange={e => setForm(p => ({ ...p, tags: e.target.value }))} placeholder="nghỉ phép, chính sách, hr" /></div>
+                    <Button disabled={saving} type="submit">
+                      {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</> : <><Save className="h-4 w-4" /> Lưu tài liệu</>}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </AnimatedItem>
+          </motion.div>
         )}
-      </div>
-    </div>
+      </AnimatePresence>
+
+      <AnimatedItem>
+        <Card>
+          <CardContent className="p-0">
+            {docs.length === 0 ? (
+              <div className="flex flex-col items-center py-16 text-slate-400">
+                <FileText className="h-12 w-12 mb-3 text-slate-200" />
+                <h3 className="text-sm font-semibold text-slate-500">Chưa có tài liệu</h3>
+                <p className="text-xs mt-1">Thêm tài liệu để chatbot có thể trả lời</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader><TableRow className="hover:bg-transparent"><TableHead>Tiêu đề</TableHead><TableHead>Danh mục</TableHead><TableHead>Tags</TableHead><TableHead>Ngày tạo</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {docs.map(d => (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-medium text-slate-900">{d.title}</TableCell>
+                      <TableCell><Badge variant="purple">{d.category}</Badge></TableCell>
+                      <TableCell><div className="flex flex-wrap gap-1">{(d.department_tags || d.role_tags || []).map(t => <Badge key={t} variant="gray">{t}</Badge>)}</div></TableCell>
+                      <TableCell className="text-xs text-slate-400">{d.created_at ? new Date(d.created_at).toLocaleDateString('vi') : '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </AnimatedItem>
+    </PageTransition>
   );
 }

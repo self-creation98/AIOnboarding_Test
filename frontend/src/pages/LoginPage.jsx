@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { login, setAuth, isAuthenticated } from '../api/client';
+import { useNavigate, Navigate } from 'react-router-dom';
+import { login, setAuth, isAuthenticated } from '@/api/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -10,8 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   if (isAuthenticated()) {
-    navigate('/', { replace: true });
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -34,36 +36,46 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="logo-section">
-          <div className="icon">🚀</div>
-          <h1>AI Onboarding</h1>
-          <p>Hệ thống onboarding thông minh</p>
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-full max-w-[360px] mx-4">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-900 mb-4">
+            <Sparkles className="h-5 w-5 text-white" />
+          </div>
+          <h1 className="text-lg font-semibold text-zinc-900">AI Onboarding</h1>
+          <p className="mt-1 text-sm text-zinc-400">Đăng nhập vào hệ thống</p>
         </div>
 
-        {error && <div className="login-error">⚠️ {error}</div>}
+        {/* Error */}
+        {error && (
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Email</label>
-            <input className="form-input" type="email" value={email}
-              onChange={e => setEmail(e.target.value)} placeholder="admin@company.com" required />
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="text-sm font-medium text-zinc-700 mb-1.5 block">Email</label>
+            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@company.com" required autoComplete="email" />
           </div>
-          <div className="form-group">
-            <label className="form-label">Mật khẩu</label>
-            <input className="form-input" type="password" value={password}
-              onChange={e => setPassword(e.target.value)} placeholder="••••••" required />
+          <div>
+            <label className="text-sm font-medium text-zinc-700 mb-1.5 block">Mật khẩu</label>
+            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••" required autoComplete="current-password" />
           </div>
-          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
-            disabled={loading} type="submit">
-            {loading ? '⏳ Đang xử lý...' : '🔑 Đăng nhập'}
-          </button>
+          <Button type="submit" disabled={loading} className="w-full" size="lg">
+            {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang xử lý...</> : <>Đăng nhập <ArrowRight className="h-4 w-4" /></>}
+          </Button>
         </form>
 
-        <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--text-muted)' }}>
-          Demo: admin@company.com / 123456
-        </p>
+        <div className="mt-6 text-center">
+          <p className="text-xs text-zinc-300">Demo: admin@company.com / 123456</p>
+        </div>
+
+        <div className="mt-8 border-t border-zinc-100 pt-6 text-center">
+          <p className="text-xs text-zinc-400">Powered by AI Onboarding Platform</p>
+        </div>
       </div>
     </div>
   );

@@ -404,12 +404,22 @@ async def copilot_summary(
             .eq("status", "missing").execute())
         missing_docs = len(pb_res.data or [])
 
-        # ============================================
-        # TODO: Nối Agent ML tại đây
-        # result = await copilot_summarize(employee_data)
-        # ============================================
+        # ─── AI Copilot (fallback to rule-based) ───
         risk_factors = []
         suggested_actions = []
+        ai_summary = None
+        try:
+            from src.agent.interface import copilot_analyze
+            ai_result = await copilot_analyze(eid)
+            if ai_result.get("summary"):
+                ai_summary = ai_result["summary"]
+                risk_factors = ai_result.get("risk_factors", [])
+                suggested_actions = [
+                    {"type": s.get("type", ""), "label": s.get("label", ""), "target": s.get("target", "")}
+                    for s in ai_result.get("suggestions", [])
+                ]
+        except Exception as ai_err:
+            logger.warning(f"AI copilot fallback to rule-based: {ai_err}")
 
         if overdue > 0:
             risk_factors.append(f"{overdue} nhiệm vụ quá hạn")
@@ -429,7 +439,9 @@ async def copilot_summary(
         risk_count = len(risk_factors)
         priority = "low" if risk_count == 0 else ("medium" if risk_count <= 2 else "high")
 
-        if risk_factors:
+        if ai_summary:
+            summary = ai_summary
+        elif risk_factors:
             summary = f"NV {employee['full_name']} cần chú ý: {'; '.join(risk_factors)}."
         else:
             summary = f"NV {employee['full_name']} đang onboard bình thường, không có vấn đề."
@@ -438,7 +450,7 @@ async def copilot_summary(
             "employee_id": eid, "employee_name": employee["full_name"],
             "summary": summary, "risk_factors": risk_factors,
             "suggested_actions": suggested_actions,
-            "priority": priority, "data_source": "rule_based",
+            "priority": priority, "data_source": "ai_powered" if ai_summary else "rule_based",
         })
     except Exception as e:
         logger.error(f"Copilot error: {e}")

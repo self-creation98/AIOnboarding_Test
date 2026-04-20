@@ -1,15 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ToastProvider } from './components/Toast';
-import Layout from './components/Layout';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import EmployeeDetailPage from './pages/EmployeeDetailPage';
-import MockPanelPage from './pages/MockPanelPage';
-import DocumentsPage from './pages/DocumentsPage';
-import ChatPage from './pages/ChatPage';
-import StakeholderTasksPage from './pages/StakeholderTasksPage';
-import MyOnboardingPage from './pages/MyOnboardingPage';
-import { getUser } from './api/client';
+import { ToastProvider } from '@/components/Toast';
+import Layout from '@/components/Layout';
+import LoginPage from '@/pages/LoginPage';
+import DashboardPage from '@/pages/DashboardPage';
+import EmployeeDetailPage from '@/pages/EmployeeDetailPage';
+import MockPanelPage from '@/pages/MockPanelPage';
+import DocumentsPage from '@/pages/DocumentsPage';
+import ChatPage from '@/pages/ChatPage';
+import StakeholderTasksPage from '@/pages/StakeholderTasksPage';
+import MyOnboardingPage from '@/pages/MyOnboardingPage';
+import { getUser } from '@/api/client';
 
 export default function App() {
   const user = getUser();

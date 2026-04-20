@@ -89,11 +89,33 @@ async def upload_document(
             return _err("Insert failed — no data returned")
 
         doc = result.data[0]
+
+        # Hook: RAG ingestion pipeline (chunk → embed → store)
+        chunks_created = 0
+        try:
+            from src.agent.interface import ingest_document
+            ingestion = await ingest_document(
+                doc_id=doc["id"],
+                content=body.content,
+                title=body.title,
+                department_tags=body.department_tags,
+                role_tags=body.role_tags,
+            )
+            chunks_created = ingestion.get("chunks_created", 0)
+            if chunks_created > 0:
+                supabase.table("knowledge_documents").update(
+                    {"is_indexed": True}
+                ).eq("id", doc["id"]).execute()
+        except Exception as ingest_err:
+            logger.warning(f"Ingestion skipped (agent not available): {ingest_err}")
+
         return _ok({
             "document_id": doc["id"],
             "title": doc["title"],
             "word_count": doc["word_count"],
-            "message": "Đã upload. Chờ index.",
+            "chunks_created": chunks_created,
+            "is_indexed": chunks_created > 0,
+            "message": "Đã upload và index." if chunks_created > 0 else "Đã upload. Chờ index.",
         })
 
     except Exception as e:

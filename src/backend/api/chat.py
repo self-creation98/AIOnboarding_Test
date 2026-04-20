@@ -124,19 +124,21 @@ async def send_message(
         }).execute()
 
         # (d) Goi Agent ML de lay response
-        # ============================================
-        # TODO: Nối Agent ML tại đây
-        # Thay thế hardcode bằng:
-        # result = await agent_chat(message, employee_context)
-        # answer = result["answer"]
-        # sources = result["sources"]
-        # confidence = result["confidence"]
-        # actions_taken = result["actions"]
-        # ============================================
-        answer = "Đây là câu trả lời tạm thời. Agent ML chưa được nối."
-        sources = []
-        confidence = 0.0
-        actions_taken = []
+        try:
+            from src.agent.interface import chat as agent_chat
+            agent_result = await agent_chat(body.message, body.employee_id, conversation_id)
+            answer = agent_result.get("response", "Xin lỗi, không thể xử lý.")
+            sources = agent_result.get("sources", [])
+            confidence = agent_result.get("confidence", 0.0)
+            actions_taken = agent_result.get("actions_taken", [])
+        except ImportError:
+            logger.warning("Agent module not installed, using fallback")
+            answer = "Agent ML chưa được cài đặt. Vui lòng liên hệ admin."
+            sources, confidence, actions_taken = [], 0.0, []
+        except Exception as agent_err:
+            logger.warning(f"Agent error, fallback: {agent_err}")
+            answer = "Xin lỗi, hệ thống AI đang gặp sự cố. Vui lòng thử lại."
+            sources, confidence, actions_taken = [], 0.0, []
 
         # (e) Luu assistant message
         supabase.table("chatbot_messages").insert({

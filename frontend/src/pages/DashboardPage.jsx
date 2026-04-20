@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
+import { api } from '@/api/client';
+import Header from '@/components/Header';
+import StatCard from '@/components/StatCard';
+import HealthIndicator from '@/components/HealthIndicator';
+import { PageTransition, AnimatedItem } from '@/components/PageTransition';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Users, AlertTriangle, CheckCircle2, ShieldAlert, TrendingUp, Construction } from 'lucide-react';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [bottlenecks, setBottlenecks] = useState([]);
-  const [tab, setTab] = useState('overview');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   async function loadData() {
     setLoading(true);
@@ -30,132 +38,129 @@ export default function DashboardPage() {
   }
 
   function healthBadge(score) {
-    if (!score && score !== 0) return <span className="badge gray">N/A</span>;
-    if (score >= 80) return <span className="badge green">🟢 {score}</span>;
-    if (score >= 50) return <span className="badge yellow">🟡 {score}</span>;
-    return <span className="badge red">🔴 {score}</span>;
+    if (!score) return <Badge variant="gray">N/A</Badge>;
+    if (score === 'green') return <Badge variant="green">Healthy</Badge>;
+    if (score === 'yellow') return <Badge variant="yellow">At Risk</Badge>;
+    if (score === 'red') return <Badge variant="red">Critical</Badge>;
+    return <Badge variant="gray">{score}</Badge>;
   }
 
   function statusBadge(s) {
-    const map = {
-      pre_boarding: ['blue', 'Pre-boarding'],
-      in_progress: ['yellow', 'Đang OB'],
-      completed: ['green', 'Hoàn thành'],
-    };
+    const map = { pre_boarding: ['blue', 'Pre-boarding'], in_progress: ['yellow', 'In Progress'], completed: ['green', 'Completed'] };
     const [c, l] = map[s] || ['gray', s];
-    return <span className={`badge ${c}`}>{l}</span>;
+    return <Badge variant={c}>{l}</Badge>;
   }
 
-  if (loading) return <div className="loading"><div className="spinner" />Đang tải dữ liệu...</div>;
+  if (loading) {
+    return (
+      <div>
+        <Header title="Dashboard" subtitle="System overview" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+        </div>
+        <Skeleton className="h-32 rounded-2xl mb-6" />
+        <Skeleton className="h-64 rounded-2xl" />
+      </div>
+    );
+  }
 
   const ov = overview || {};
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>📊 Dashboard</h1>
-        <p>Tổng quan hệ thống onboarding</p>
-      </div>
-
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon blue">👥</div>
-          <div><div className="stat-value">{ov.total_employees || 0}</div><div className="stat-label">Tổng nhân viên</div></div>
+    <PageTransition>
+      <AnimatedItem>
+        <Header title="Dashboard" subtitle="Tổng quan hệ thống onboarding" />
+      </AnimatedItem>
+      <AnimatedItem>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          <StatCard icon={Users} label="Đang onboarding" value={ov.total_onboarding || 0} color="blue" />
+          <StatCard icon={AlertTriangle} label="Quá hạn" value={ov.overdue_count || 0} color="yellow" />
+          <StatCard icon={CheckCircle2} label="Hoàn thành tháng" value={ov.completed_this_month || 0} color="green" />
+          <StatCard icon={ShieldAlert} label="Cần chú ý" value={ov.at_risk_count || 0} color="red" />
+          <StatCard icon={TrendingUp} label="TB hoàn thành" value={ov.avg_completion ? `${Math.round(ov.avg_completion)}%` : '—'} color="purple" />
         </div>
-        <div className="stat-card">
-          <div className="stat-icon yellow">⏳</div>
-          <div><div className="stat-value">{ov.in_progress || 0}</div><div className="stat-label">Đang onboarding</div></div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon green">✅</div>
-          <div><div className="stat-value">{ov.completed || 0}</div><div className="stat-label">Hoàn thành</div></div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon red">🚨</div>
-          <div><div className="stat-value">{ov.at_risk || 0}</div><div className="stat-label">Cần chú ý</div></div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon purple">📈</div>
-          <div><div className="stat-value">{ov.avg_completion ? `${Math.round(ov.avg_completion)}%` : '—'}</div><div className="stat-label">TB hoàn thành</div></div>
-        </div>
-      </div>
-
-      {/* Health Distribution */}
+      </AnimatedItem>
       {ov.health_distribution && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-title" style={{ marginBottom: 12 }}>🏥 Phân bố sức khỏe onboarding</div>
-          <div style={{ display: 'flex', gap: 24 }}>
-            {Object.entries(ov.health_distribution).map(([k, v]) => (
-              <div key={k} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 700 }}>{v}</div>
-                <div className={`badge ${k}`} style={{ marginTop: 4 }}>{k === 'green' ? '🟢 Tốt' : k === 'yellow' ? '🟡 TB' : '🔴 Nguy hiểm'}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <AnimatedItem>
+          <Card className="mb-6">
+            <CardHeader><CardTitle>Onboarding Health</CardTitle></CardHeader>
+            <CardContent><HealthIndicator distribution={ov.health_distribution} /></CardContent>
+          </Card>
+        </AnimatedItem>
       )}
-
-      {/* Tabs */}
-      <div className="tabs">
-        <button className={`tab-btn${tab === 'overview' ? ' active' : ''}`} onClick={() => setTab('overview')}>👥 Nhân viên</button>
-        <button className={`tab-btn${tab === 'bottleneck' ? ' active' : ''}`} onClick={() => setTab('bottleneck')}>🚧 Bottlenecks</button>
-      </div>
-
-      {tab === 'overview' && (
-        <div className="card">
-          {employees.length === 0 ? (
-            <div className="empty-state"><div className="icon">👤</div><h3>Chưa có nhân viên</h3><p>Sử dụng Mock Panel để tạo nhân viên mới</p></div>
-          ) : (
-            <table className="data-table">
-              <thead><tr><th>Tên</th><th>Phòng ban</th><th>Vị trí</th><th>Status</th><th>Tiến độ</th><th>Sức khỏe</th></tr></thead>
-              <tbody>
-                {employees.map(e => (
-                  <tr key={e.id} className="clickable" onClick={() => navigate(`/employee/${e.id}`)}>
-                    <td style={{ fontWeight: 500 }}>{e.full_name}</td>
-                    <td>{e.department || '—'}</td>
-                    <td>{e.role || '—'}</td>
-                    <td>{statusBadge(e.onboarding_status)}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div className="progress-bar" style={{ width: 80 }}>
-                          <div className={`progress-fill ${(e.completion_percentage || 0) >= 80 ? 'green' : (e.completion_percentage || 0) >= 40 ? 'yellow' : 'accent'}`}
-                            style={{ width: `${e.completion_percentage || 0}%` }} />
-                        </div>
-                        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{Math.round(e.completion_percentage || 0)}%</span>
-                      </div>
-                    </td>
-                    <td>{healthBadge(e.health_score)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {tab === 'bottleneck' && (
-        <div className="card">
-          {bottlenecks.length === 0 ? (
-            <div className="empty-state"><div className="icon">✅</div><h3>Không có bottleneck</h3><p>Tất cả tasks đang chạy tốt</p></div>
-          ) : (
-            <div>
-              {bottlenecks.map((b, i) => (
-                <div key={i} style={{ padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 15 }}>🚧 {b.task_title}</div>
-                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-                        {b.stuck_count} NV bị stuck • TB quá hạn {Math.round(b.avg_overdue_days || 0)} ngày
-                      </div>
-                    </div>
-                    <span className="badge red">{b.stuck_count} NV</span>
+      <AnimatedItem>
+        <Tabs defaultValue="employees">
+          <TabsList>
+            <TabsTrigger value="employees"><Users className="h-4 w-4" /> Nhân viên</TabsTrigger>
+            <TabsTrigger value="bottlenecks"><Construction className="h-4 w-4" /> Bottlenecks</TabsTrigger>
+          </TabsList>
+          <TabsContent value="employees">
+            <Card>
+              <CardContent className="p-0">
+                {employees.length === 0 ? (
+                  <div className="flex flex-col items-center py-16 text-slate-400">
+                    <Users className="h-12 w-12 mb-3 text-slate-200" />
+                    <h3 className="text-sm font-semibold text-slate-500">Chưa có nhân viên</h3>
+                    <p className="text-xs mt-1">Sử dụng Mock Panel để tạo</p>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Tên</TableHead><TableHead>Phòng ban</TableHead><TableHead>Vị trí</TableHead>
+                        <TableHead>Status</TableHead><TableHead>Tiến độ</TableHead><TableHead>Sức khỏe</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {employees.map(e => (
+                        <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/employee/${e.id}`)}>
+                          <TableCell className="font-medium text-slate-900">{e.full_name}</TableCell>
+                          <TableCell>{e.department || '—'}</TableCell>
+                          <TableCell className="text-slate-500">{e.role || '—'}</TableCell>
+                          <TableCell>{statusBadge(e.onboarding_status)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2.5 min-w-[120px]">
+                              <Progress value={e.completion_percentage || 0} color={(e.completion_percentage||0)>=80?'green':(e.completion_percentage||0)>=40?'yellow':'primary'} className="w-20" />
+                              <span className="text-xs font-medium text-slate-400">{Math.round(e.completion_percentage||0)}%</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{healthBadge(e.health_score)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="bottlenecks">
+            <Card>
+              <CardContent className="p-0">
+                {bottlenecks.length === 0 ? (
+                  <div className="flex flex-col items-center py-16 text-slate-400">
+                    <CheckCircle2 className="h-12 w-12 mb-3 text-slate-200" />
+                    <h3 className="text-sm font-semibold text-slate-500">Không có bottleneck</h3>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {bottlenecks.map((b, i) => (
+                      <div key={i} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 transition-colors">
+                        <div>
+                          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                            <Construction className="h-4 w-4 text-amber-500" />{b.task_name}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-400">{b.affected_employees} NV stuck • TB quá hạn {Math.round(b.avg_overdue_days||0)} ngày</div>
+                        </div>
+                        <Badge variant="red">{b.affected_employees} NV</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </AnimatedItem>
+    </PageTransition>
   );
 }

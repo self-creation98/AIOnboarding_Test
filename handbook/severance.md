@@ -1,0 +1,7 @@
+# Gói Trợ Cấp Thôi Việc
+
+Nếu việc làm hoặc hợp đồng của bạn với 37signals bị chấm dứt, bạn có thể đủ điều kiện nhận gói trợ cấp thôi việc. Trong hầu hết các trường hợp, nếu bạn đã làm việc với công ty dưới 1 năm, bạn sẽ được đề nghị một khoản thanh toán một lần tương đương 4 tuần lương. Nếu bạn đã làm việc với công ty trên 1 năm, bạn sẽ được đề nghị thêm 2 tuần lương cho mỗi năm làm việc, với mức tối đa là 4 tháng lương trợ cấp thôi việc.
+
+Gói trợ cấp cũng sẽ bao gồm bảo hiểm y tế cho bạn và người phụ thuộc nếu bạn đã tham gia các chính sách của chúng tôi trong cùng khoảng thời gian đó, bồi thường cho thời gian nghỉ phép chưa sử dụng, và bồi thường cho thời gian Sabbatical chưa sử dụng nếu có áp dụng (áp dụng cho 1 năm gần nhất).
+
+Bồi thường cho PTO chưa sử dụng được tính dựa trên mức lương theo giờ của bạn. Đổi lại, bạn sẽ được yêu cầu ký một văn bản miễn trừ trách nhiệm chung và các điều khoản chấm dứt việc làm tiêu chuẩn khác. Nếu bạn bị chấm dứt hợp đồng vì lý do chính đáng; chẳng hạn như hành vi sai trái, vi phạm chính sách công ty, bất tuân hoặc lạm dụng chất kích thích trong khi làm việc, bạn sẽ không đủ điều kiện nhận trợ cấp thôi việc trừ khi có quyết định khác từ ban quản lý.
