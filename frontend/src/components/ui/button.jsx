@@ -4,22 +4,22 @@ import { cva } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/40 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
   {
     variants: {
       variant: {
-        default: "bg-primary-600 text-white shadow-xs hover:bg-primary-700 active:bg-primary-800",
-        secondary: "bg-white text-[#6e6880] border border-[#eeedf0] hover:bg-[#f5f3ff] hover:text-primary-600 hover:border-primary-200",
-        ghost: "text-[#6e6880] hover:text-primary-600 hover:bg-primary-50",
-        success: "bg-emerald-600 text-white hover:bg-emerald-700",
-        danger: "bg-red-500 text-white hover:bg-red-600",
-        outline: "border border-[#eeedf0] bg-white text-[#1a1523] hover:bg-[#faf9fb] hover:border-[#ddd9e4]",
+        default: "bg-primary-700 text-white shadow-sm hover:bg-primary-800 hover:shadow-md active:scale-[0.98]",
+        secondary: "bg-white text-primary-700 border border-[#e9e5f0] shadow-xs hover:bg-primary-50 hover:border-primary-200",
+        ghost: "text-[#7c6fa0] hover:text-primary-700 hover:bg-primary-50",
+        success: "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700",
+        danger: "bg-red-500 text-white shadow-sm hover:bg-red-600",
+        outline: "border border-[#e9e5f0] bg-white text-[#1e1042] shadow-xs hover:bg-primary-50 hover:border-primary-300",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-7 px-3 text-xs rounded-lg",
-        lg: "h-10 px-6",
-        icon: "h-9 w-9 rounded-xl",
+        default: "h-10 px-5 py-2",
+        sm: "h-8 px-3.5 text-xs rounded-lg",
+        lg: "h-11 px-6",
+        icon: "h-10 w-10 rounded-xl",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

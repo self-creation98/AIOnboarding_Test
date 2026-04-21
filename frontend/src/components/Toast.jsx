@@ -5,11 +5,7 @@ import { cn } from '@/lib/utils';
 
 const ToastContext = createContext(null);
 const iconMap = { success: CheckCircle2, error: XCircle, info: Info };
-const styles = {
-  success: 'border-emerald-200 bg-white',
-  error: 'border-red-200 bg-white',
-  info: 'border-[#eeedf0] bg-white',
-};
+const styles = { success: 'border-emerald-200', error: 'border-red-200', info: 'border-primary-200' };
 const iconStyles = { success: 'text-emerald-500', error: 'text-red-500', info: 'text-primary-500' };
 
 export function ToastProvider({ children }) {
@@ -30,10 +26,10 @@ export function ToastProvider({ children }) {
             const Icon = iconMap[t.type] || Info;
             return (
               <motion.div key={t.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} transition={{ duration: 0.2 }}
-                className={cn('flex items-start gap-2.5 rounded-xl border p-3.5 shadow-md', styles[t.type])}>
-                <Icon className={cn('h-4 w-4 shrink-0 mt-0.5', iconStyles[t.type])} />
-                <p className="flex-1 text-sm text-[#1a1523] leading-snug">{t.message}</p>
-                <button onClick={() => removeToast(t.id)} className="shrink-0 text-[#9e97b0] hover:text-[#6e6880]"><X className="h-3.5 w-3.5" /></button>
+                className={cn('flex items-start gap-3 rounded-2xl border bg-white p-4 shadow-lg', styles[t.type])}>
+                <Icon className={cn('h-5 w-5 shrink-0 mt-0.5', iconStyles[t.type])} />
+                <p className="flex-1 text-sm font-medium text-[#1e1042] leading-snug">{t.message}</p>
+                <button onClick={() => removeToast(t.id)} className="shrink-0 text-[#7c6fa0] hover:text-[#1e1042]"><X className="h-4 w-4" /></button>
               </motion.div>
             );
           })}
