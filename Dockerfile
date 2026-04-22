@@ -14,8 +14,11 @@ RUN cd frontend && npm run build
 
 # Copy backend source
 COPY src/ ./src/
-COPY .env* ./
-# Make sure any other files needed are copied
+
+# Copy handbook data (used by RAG agent)
+COPY handbook/ ./handbook/
+
+# Env vars are injected by Render at runtime — no .env file needed
 
 # Start command
 CMD sh -c "uvicorn src.backend.main:app --host 0.0.0.0 --port ${PORT:-8080}"
