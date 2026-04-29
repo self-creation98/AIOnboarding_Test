@@ -18,6 +18,14 @@ from src.backend.services.event_dispatcher import fire_event
 
 logger = logging.getLogger(__name__)
 
+# Lazy import to avoid startup failure if Slack not configured
+def _slack():
+    try:
+        from src.slack_bot import notifications as slack
+        return slack
+    except Exception:
+        return None
+
 
 async def run_daily_reminders(supabase) -> dict:
     """
@@ -150,7 +158,16 @@ async def run_daily_reminders(supabase) -> dict:
                 "channel": "system",
                 "sent_at": now.isoformat(),
             }).execute()
-            # TODO: Gửi Slack cho channel tương ứng
+            # Gửi Slack cho channel tương ứng (owner = it/admin/manager)
+            try:
+                s = _slack()
+                if s:
+                    s.send_channel(
+                        f"#{'it-support' if item_owner == 'it' else item_owner}",
+                        message,
+                    )
+            except Exception as e:
+                logger.warning(f"Slack notification failed (tier1 stakeholder): {e}")
             tier1 += 1
 
         elif overdue_hours < 48:
@@ -169,7 +186,18 @@ async def run_daily_reminders(supabase) -> dict:
                 "channel": "system",
                 "sent_at": now.isoformat(),
             }).execute()
-            # TODO: Gửi Slack DM cho NV
+            # Gửi Slack DM cho NV
+            try:
+                s = _slack()
+                if s:
+                    s.send_reminder_tier1(
+                        email=employee.get("email", ""),
+                        name=employee.get("full_name", ""),
+                        task=item["title"],
+                        overdue_days=overdue_days,
+                    )
+            except Exception as e:
+                logger.warning(f"Slack notification failed (tier1): {e}")
             tier1 += 1
 
         elif overdue_hours < 72:
@@ -202,7 +230,19 @@ async def run_daily_reminders(supabase) -> dict:
                     "channel": "system",
                     "sent_at": now.isoformat(),
                 }).execute()
-                # TODO: Gửi Slack DM cho manager
+                # Gửi Slack DM cho manager
+                try:
+                    s = _slack()
+                    if s:
+                        s.send_reminder_tier2(
+                            manager_email=manager_email,
+                            manager_name=manager.get("full_name", ""),
+                            employee_name=employee.get("full_name", ""),
+                            task=item["title"],
+                            overdue_days=overdue_days,
+                        )
+                except Exception as e:
+                    logger.warning(f"Slack notification failed (tier2): {e}")
                 tier2 += 1
             else:
                 # Không có manager → escalate lên HR luôn
@@ -246,6 +286,18 @@ async def run_daily_reminders(supabase) -> dict:
                     "escalation_tier": 3,
                 })
 
+                # Gửi Slack tier 3 alert cho HR channel
+                try:
+                    s = _slack()
+                    if s:
+                        s.send_reminder_tier3(
+                            employee_name=employee.get("full_name", ""),
+                            task=item["title"],
+                            overdue_days=overdue_days,
+                        )
+                except Exception as e:
+                    logger.warning(f"Slack notification failed (tier3 no-manager): {e}")
+
                 tier3 += 1
 
         else:
@@ -288,6 +340,18 @@ async def run_daily_reminders(supabase) -> dict:
                 "overdue_days": overdue_days,
                 "escalation_tier": 3,
             })
+
+            # Gửi Slack tier 3 alert cho HR channel
+            try:
+                s = _slack()
+                if s:
+                    s.send_reminder_tier3(
+                        employee_name=employee.get("full_name", ""),
+                        task=item["title"],
+                        overdue_days=overdue_days,
+                    )
+            except Exception as e:
+                logger.warning(f"Slack notification failed (tier3): {e}")
 
             tier3 += 1
 

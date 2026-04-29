@@ -11,11 +11,14 @@ Endpoints:
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File
+import shutil
+import tempfile
+from pathlib import Path
 from pydantic import BaseModel, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user, RequireRole
+from src.backend.api.deps import get_current_active_user
 from src.backend.schemas import UserInfo
 
 logger = logging.getLogger(__name__)
@@ -59,7 +62,7 @@ def _err(msg: str, status_code: int = 400):
 )
 async def upload_document(
     body: DocumentUpload,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/documents/upload — upload tai lieu text."""
     try:
@@ -89,33 +92,11 @@ async def upload_document(
             return _err("Insert failed — no data returned")
 
         doc = result.data[0]
-
-        # Hook: RAG ingestion pipeline (chunk → embed → store)
-        chunks_created = 0
-        try:
-            from src.agent.interface import ingest_document
-            ingestion = await ingest_document(
-                doc_id=doc["id"],
-                content=body.content,
-                title=body.title,
-                department_tags=body.department_tags,
-                role_tags=body.role_tags,
-            )
-            chunks_created = ingestion.get("chunks_created", 0)
-            if chunks_created > 0:
-                supabase.table("knowledge_documents").update(
-                    {"is_indexed": True}
-                ).eq("id", doc["id"]).execute()
-        except Exception as ingest_err:
-            logger.warning(f"Ingestion skipped (agent not available): {ingest_err}")
-
         return _ok({
             "document_id": doc["id"],
             "title": doc["title"],
             "word_count": doc["word_count"],
-            "chunks_created": chunks_created,
-            "is_indexed": chunks_created > 0,
-            "message": "Đã upload và index." if chunks_created > 0 else "Đã upload. Chờ index.",
+            "message": "Đã upload. Chờ index.",
         })
 
     except Exception as e:
@@ -129,7 +110,7 @@ async def upload_document(
     description="Lay danh sach tat ca tai lieu, order by created_at DESC.",
 )
 async def list_documents(
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/documents — danh sach tai lieu."""
     try:
@@ -159,7 +140,7 @@ async def list_documents(
 )
 async def get_document(
     document_id: str,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/documents/{id} — chi tiet + chunks count."""
     try:
@@ -205,7 +186,7 @@ async def get_document(
 )
 async def delete_document(
     document_id: str,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """DELETE /api/documents/{id} — xoa document + chunks."""
     try:
@@ -230,3 +211,75 @@ async def delete_document(
     except Exception as e:
         logger.error(f"Delete document error: {e}")
         return _err(str(e))
+
+@router.post(
+    "/upload-file",
+    summary="Upload file tai lieu (.md, .pdf, .docx, .txt)",
+    description="Upload file và tự động clean, semantic chunk, index vào ChromaDB.",
+    status_code=201,
+)
+async def upload_document_file(
+    file: UploadFile = File(...),
+    category: str | None = None,
+    current_user: UserInfo = Depends(get_current_active_user),
+):
+    import asyncio
+    tmp_path = None
+    try:
+        supabase = get_supabase()
+        
+        # Save temp file asynchronously to avoid blocking
+        safe_suffix = Path(file.filename).name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{safe_suffix}") as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp_path = Path(tmp.name)
+            
+        import sys
+        ROOT = Path(__file__).resolve().parent.parent.parent.parent
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+            
+        from scripts.hr_pipeline import process_and_chunk_documents
+        from src.backend.rag.chroma_store import ChromaVectorStore
+        
+        # Heavy CPU and synchronous IO processing in a thread
+        def _process_and_save():
+            cleaned_chunks = process_and_chunk_documents(tmp_path)
+            if not cleaned_chunks:
+                return None
+                
+            store = ChromaVectorStore()
+            count = store.ingest(force=False, custom_documents=cleaned_chunks)
+            
+            # Save metadata to supabase
+            supabase.table("knowledge_documents").insert({
+                "title": file.filename,
+                "content": f"[File đính kèm: {file.filename}]",
+                "source_type": "file_upload",
+                "language": "vi",
+                "is_indexed": True,
+                "category": category or "general",
+                "word_count": sum(len(c.get("content", "").split()) for c in cleaned_chunks),
+            }).execute()
+            
+            return count
+
+        count = await asyncio.to_thread(_process_and_save)
+        
+        if count is None:
+            return _err("Không đọc được dữ liệu từ file.")
+
+        return _ok({
+            "filename": file.filename,
+            "chunks_added": count,
+            "message": "Upload file và index thành công."
+        })
+        
+    except Exception as e:
+        logger.error(f"Upload file error: {e}")
+        return _err(str(e))
+    finally:
+        # Guarantee cleanup even if exceptions occur
+        if tmp_path and tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)

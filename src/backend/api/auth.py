@@ -102,7 +102,7 @@ def _get_employee_by_email(email: str) -> dict:
 Đăng nhập bằng email công ty và mật khẩu.
 
 **Quy trình bảo mật:**
-1. Validate email domain (chỉ chấp nhận @company.com)
+1. Validate email domain (chỉ chấp nhận @gmail.com)
 2. Xác thực qua Supabase Auth
 3. Kiểm tra email tồn tại trong bảng employees
 4. Trả về JWT token kèm thông tin vai_tro (role)

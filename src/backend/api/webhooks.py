@@ -34,7 +34,7 @@ router = APIRouter(prefix="/api/webhooks", tags=["Webhooks"])
 class EmployeeData(BaseModel):
     """Data cho new-employee webhook."""
     full_name: str = Field(..., examples=["Nguyễn Văn An"])
-    email: str = Field(..., examples=["an.nguyen@company.com"])
+    email: str = Field(..., examples=["an.nguyen@gmail.com"])
     personal_email: str | None = Field(default=None, examples=["an.nguyen@gmail.com"])
     role: str = Field(..., examples=["software_engineer"])
     department: str = Field(..., examples=["engineering"])
@@ -68,7 +68,7 @@ class CourseCompletedWebhook(BaseModel):
 class TicketItem(BaseModel):
     """Chi tiết 1 item đã provision."""
     type: str = Field(..., examples=["email"])
-    detail: str = Field(..., examples=["an.nguyen@company.com đã tạo"])
+    detail: str = Field(..., examples=["an.nguyen@gmail.com đã tạo"])
 
 
 class TicketData(BaseModel):
@@ -235,6 +235,8 @@ async def webhook_new_employee(body: NewEmployeeWebhook):
             insert_data["personal_email"] = data.personal_email
         if data.manager_id:
             insert_data["manager_id"] = data.manager_id
+        if data.location:
+            insert_data["location"] = data.location
 
         emp_result = supabase.table("employees").insert(insert_data).execute()
 
@@ -380,6 +382,17 @@ async def webhook_new_employee(body: NewEmployeeWebhook):
 
         # (f) Log webhook
         _log_webhook(supabase, "in", "employee.created", request_body, success=True)
+
+        # (g) Gửi Slack welcome DM cho NV mới
+        try:
+            from src.slack_bot import notifications as slack
+            slack.send_welcome(
+                name=data.full_name,
+                email=data.email,
+                checklist_count=checklist_items_count,
+            )
+        except Exception as e:
+            logger.warning(f"Slack welcome failed for {data.email}: {e}")
 
         return _ok({
             "employee_id": employee_id,
@@ -543,44 +556,20 @@ async def webhook_ticket_resolved(body: TicketResolvedWebhook):
             checklist_items_updated += 1
             plan_id = item["plan_id"]
 
-        # (c) Auto-create Supabase Auth User so employee can log in
-        auth_created = False
-        emp_result = supabase.table("employees").select("email").eq("id", data.employee_id).limit(1).execute()
-        if emp_result.data:
-            employee_email = emp_result.data[0]["email"]
-            try:
-                supabase.auth.admin.create_user({
-                    "email": employee_email,
-                    "password": "123456",
-                    "email_confirm": True
-                })
-                auth_created = True
-                actions_taken_log = f"Auth user {employee_email} created."
-            except Exception as e:
-                # Bỏ qua nếu user đã tồn tại
-                if "already registered" in str(e).lower() or "already exists" in str(e).lower():
-                    auth_created = True
-                    actions_taken_log = f"Auth user {employee_email} already exists."
-                else:
-                    actions_taken_log = f"Auth user creation failed: {e}"
-        else:
-            actions_taken_log = "Employee not found for auth creation."
-
-        # (d) Tính lại completion_percentage
+        # (c) Tính lại completion_percentage
         new_percentage = 0.0
         if plan_id:
             new_percentage = _recalc_completion(supabase, plan_id)
 
-        # (e) Log webhook
-        _log_webhook(supabase, "in", "ticket.resolved", request_body, success=True, error_message=actions_taken_log)
+        # (d) Log webhook
+        _log_webhook(supabase, "in", "ticket.resolved", request_body, success=True)
 
         return _ok({
             "employee_id": data.employee_id,
             "stakeholder_tasks_completed": stakeholder_tasks_completed,
             "checklist_items_updated": checklist_items_updated,
             "new_completion_percentage": new_percentage,
-            "auth_account_created": auth_created,
-            "message": "Đã cập nhật tasks IT và cấp quyền đăng nhập",
+            "message": "Đã cập nhật tasks IT",
         })
 
     except Exception as e:
@@ -609,7 +598,7 @@ class EmployeeUpdateData(BaseModel):
     email: str | None = Field(
         default=None,
         description="Email lookup nếu không có UUID",
-        examples=["an.nguyen@company.com"],
+        examples=["an.nguyen@gmail.com"],
     )
     changes: dict = Field(
         ...,
@@ -676,7 +665,7 @@ async def webhook_employee_updated(body: EmployeeUpdatedWebhook):
         # ─── Allowed fields to update on employee record ───
         ALLOWED_FIELDS = {
             "full_name", "email", "role", "department", "seniority",
-            "start_date", "manager_id", "personal_email",
+            "start_date", "manager_id", "location", "personal_email",
         }
 
         update_data = {}

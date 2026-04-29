@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from src.backend.database import get_supabase
 from src.backend.api.deps import get_current_active_user
 from src.backend.schemas import UserInfo
+from src.backend.rag.graph import chatbot_graph
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +65,6 @@ async def send_message(
     current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/chat — gui tin nhan, nhan phan hoi."""
-    if current_user.vai_tro == "nhan_vien_moi" and current_user.id != body.employee_id:
-        from fastapi import HTTPException, status
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     try:
         supabase = get_supabase()
 
@@ -123,22 +121,154 @@ async def send_message(
             "content": body.message,
         }).execute()
 
-        # (d) Goi Agent ML de lay response
-        try:
-            from src.agent.interface import chat as agent_chat
-            agent_result = await agent_chat(body.message, body.employee_id, conversation_id)
-            answer = agent_result.get("response", "Xin lỗi, không thể xử lý.")
-            sources = agent_result.get("sources", [])
-            confidence = agent_result.get("confidence", 0.0)
-            actions_taken = agent_result.get("actions_taken", [])
-        except ImportError:
-            logger.warning("Agent module not installed, using fallback")
-            answer = "Agent ML chưa được cài đặt. Vui lòng liên hệ admin."
-            sources, confidence, actions_taken = [], 0.0, []
-        except Exception as agent_err:
-            logger.warning(f"Agent error, fallback: {agent_err}")
-            answer = "Xin lỗi, hệ thống AI đang gặp sự cố. Vui lòng thử lại."
-            sources, confidence, actions_taken = [], 0.0, []
+        # (d) Goi chatbot_graph (LangGraph) de lay response
+
+        initial_state = {
+            "employee_id": body.employee_id,
+            "original_message": body.message,
+            "employee_context": {
+                "id": employee["id"],
+                "full_name": employee.get("full_name", ""),
+                "role": employee.get("role", ""),
+                "department": employee.get("department", ""),
+            },
+            "actions_taken": [],
+            "relevant_documents": [],
+            "sources": [],
+            "final_answer": "",
+        }
+
+        import time
+        g_start = time.time()
+        final_state = await chatbot_graph.ainvoke(initial_state)
+        logger.info(f"Chatbot Graph execution took {time.time() - g_start:.4f}s")
+
+        answer = final_state.get("final_answer") or "Xin lỗi, tôi không thể trả lời câu hỏi này."
+        sources = final_state.get("sources") or []
+        confidence = 1.0 if final_state.get("relevant_documents") else 0.5
+        actions_taken = final_state.get("actions_taken") or []
+        timings = final_state.get("timings") or {}
+
+        # (e) Luu assistant message
+        supabase.table("chatbot_messages").insert({
+            "conversation_id": conversation_id,
+            "role": "assistant",
+            "content": answer,
+            "sources": sources,
+            "confidence_score": confidence,
+            "actions_taken": actions_taken,
+        }).execute()
+
+        # (f) Update message_count += 2
+        supabase.table("chatbot_conversations").update({
+            "message_count": current_count + 2,
+        }).eq("id", conversation_id).execute()
+
+        return _ok({
+            "answer": answer,
+            "sources": sources,
+            "confidence": confidence,
+            "actions_taken": actions_taken,
+            "conversation_id": conversation_id,
+            "timings": timings,
+        })
+
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        return _err(str(e))
+
+
+@router.post(
+    "/slack",
+    summary="Chat tu Slack bot (internal, khong auth)",
+    description="Endpoint noi bo cho Slack bot goi. Khong yeu cau JWT. "
+                "Chi nen goi tu localhost.",
+    status_code=201,
+)
+async def send_message_slack(body: ChatRequest):
+    """POST /api/chat/slack — nhan message tu Slack bot, khong can auth."""
+    try:
+        supabase = get_supabase()
+
+        # (a) Lay employee info
+        emp_result = (
+            supabase.table("employees")
+            .select("id, full_name, role, department")
+            .eq("id", body.employee_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not emp_result.data:
+            return _err(f"Employee {body.employee_id} not found")
+
+        employee = emp_result.data[0]
+
+        # (b) Tim conversation dang mo (channel=slack), hoac tao moi
+        conv_result = (
+            supabase.table("chatbot_conversations")
+            .select("id, message_count")
+            .eq("employee_id", body.employee_id)
+            .eq("channel", "slack")
+            .is_("ended_at", "null")
+            .limit(1)
+            .execute()
+        )
+
+        if conv_result.data:
+            conversation = conv_result.data[0]
+            conversation_id = conversation["id"]
+            current_count = conversation.get("message_count", 0) or 0
+        else:
+            new_conv = (
+                supabase.table("chatbot_conversations")
+                .insert({
+                    "employee_id": body.employee_id,
+                    "channel": "slack",
+                    "message_count": 0,
+                })
+                .execute()
+            )
+
+            if not new_conv.data:
+                return _err("Failed to create conversation")
+
+            conversation_id = new_conv.data[0]["id"]
+            current_count = 0
+
+        # (c) Luu user message
+        supabase.table("chatbot_messages").insert({
+            "conversation_id": conversation_id,
+            "role": "user",
+            "content": body.message,
+        }).execute()
+
+        # (d) Goi chatbot_graph (LangGraph)
+        import time
+        g_start = time.time()
+
+        initial_state = {
+            "employee_id": body.employee_id,
+            "original_message": body.message,
+            "employee_context": {
+                "id": employee["id"],
+                "full_name": employee.get("full_name", ""),
+                "role": employee.get("role", ""),
+                "department": employee.get("department", ""),
+            },
+            "actions_taken": [],
+            "relevant_documents": [],
+            "sources": [],
+            "final_answer": "",
+        }
+
+        final_state = await chatbot_graph.ainvoke(initial_state)
+        logger.info(f"Slack chat — Graph execution took {time.time() - g_start:.4f}s")
+
+        answer = final_state.get("final_answer") or "Xin lỗi, tôi không thể trả lời câu hỏi này."
+        sources = final_state.get("sources") or []
+        confidence = 1.0 if final_state.get("relevant_documents") else 0.5
+        actions_taken = final_state.get("actions_taken") or []
 
         # (e) Luu assistant message
         supabase.table("chatbot_messages").insert({
@@ -164,7 +294,7 @@ async def send_message(
         })
 
     except Exception as e:
-        logger.error(f"Chat error: {e}")
+        logger.error(f"Slack chat error: {e}")
         return _err(str(e))
 
 
@@ -179,9 +309,6 @@ async def get_chat_history(
     current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/chat/history/{employee_id} — lich su chat."""
-    if current_user.vai_tro == "nhan_vien_moi" and current_user.id != employee_id:
-        from fastapi import HTTPException, status
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     try:
         supabase = get_supabase()
 

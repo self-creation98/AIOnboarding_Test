@@ -17,14 +17,14 @@ SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
 # === Auth ===
 # Chỉ cho phép đăng nhập với email thuộc các domain này
 ALLOWED_EMAIL_DOMAINS: list[str] = [
-    d.strip() for d in os.getenv("ALLOWED_EMAIL_DOMAINS", "company.com").split(",")
+    d.strip() for d in os.getenv("ALLOWED_EMAIL_DOMAINS", "gmail.com").split(",")
     if d.strip()
 ]
 
 # === Email Service ===
 EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "console")  # "resend" or "console"
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-EMAIL_FROM = os.getenv("EMAIL_FROM", "onboarding@company.com")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "onboarding@gmail.com")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "AI Onboarding System")
 
 # === Magic Link ===

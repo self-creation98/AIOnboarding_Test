@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user, RequireRole
+from src.backend.api.deps import get_current_active_user
 from src.backend.schemas import UserInfo
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ def _err(msg: str, status_code: int = 400):
 )
 async def assign_buddy(
     body: AssignBuddyRequest,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/actions/assign-buddy — nhac manager assign buddy."""
     try:
@@ -135,8 +135,12 @@ async def assign_buddy(
             "sent_at": datetime.now().isoformat(),
         }).execute()
 
-        # TODO: Gửi Slack DM cho manager khi tích hợp Slack
-        # await slack_client.send_dm(manager.slack_id, message)
+        # Gửi Slack DM cho manager
+        try:
+            from src.slack_bot import notifications as slack
+            slack.send_dm(manager["email"], message)
+        except Exception as e:
+            logger.warning(f"Slack DM failed for assign-buddy: {e}")
 
         return _ok({
             "action": "assign_buddy",
@@ -158,7 +162,7 @@ async def assign_buddy(
 )
 async def escalate_it(
     body: EscalateItRequest,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/actions/escalate-it — escalate IT tasks."""
     try:
@@ -215,8 +219,12 @@ async def escalate_it(
             "sent_at": datetime.now().isoformat(),
         }).execute()
 
-        # TODO: Gửi Slack cho #it-support khi tích hợp
-        # await slack_client.send_channel("#it-support", message)
+        # Gửi Slack cho #it-support
+        try:
+            from src.slack_bot import notifications as slack
+            slack.send_channel("#it-support", message)
+        except Exception as e:
+            logger.warning(f"Slack channel failed for escalate-it: {e}")
 
         return _ok({
             "action": "escalate_it",
@@ -238,7 +246,7 @@ async def escalate_it(
 )
 async def schedule_checkin(
     body: ScheduleCheckinRequest,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/actions/schedule-checkin — dat lich check-in."""
     try:
@@ -320,7 +328,7 @@ async def schedule_checkin(
 )
 async def send_reminder(
     body: SendReminderRequest,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/actions/send-reminder — gui nhac nho NV."""
     try:
@@ -386,8 +394,12 @@ async def send_reminder(
             "sent_at": datetime.now().isoformat(),
         }).execute()
 
-        # TODO: Gửi Slack DM cho NV khi tích hợp
-        # await slack_client.send_dm(employee.slack_id, message)
+        # Gửi Slack DM cho NV
+        try:
+            from src.slack_bot import notifications as slack
+            slack.send_dm(employee["email"], message)
+        except Exception as e:
+            logger.warning(f"Slack DM failed for send-reminder: {e}")
 
         return _ok({
             "action": "send_reminder",
@@ -410,7 +422,7 @@ async def send_reminder(
 async def get_action_history(
     employee_id: str | None = Query(default=None, description="Filter theo employee"),
     action_type: str | None = Query(default=None, description="Filter: assign_buddy, escalate_it, schedule_checkin, send_reminder"),
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/actions/history — lich su actions."""
     try:

@@ -260,8 +260,8 @@ def build_stakeholder_email(
 # Default email addresses cho từng team
 # Trong production, nên lấy từ DB hoặc config
 TEAM_EMAILS: dict[str, str] = {
-    "it": "it-admin@company.com",
-    "admin": "hr-admin@company.com",
+    "it": "it-admin@gmail.com",
+    "admin": "hr-admin@gmail.com",
     "manager": "",  # Lấy từ employee.manager_id → email
 }
 

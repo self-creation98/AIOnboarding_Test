@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user, RequireRole
+from src.backend.api.deps import get_current_active_user
 from src.backend.schemas import UserInfo
 from src.backend.services.event_dispatcher import (
     VALID_EVENT_TYPES,
@@ -43,7 +43,7 @@ class WebhookConfigCreate(BaseModel):
     url: str = Field(
         ...,
         description="URL nhận webhook (HTTPS recommended)",
-        examples=["https://hris.company.com/webhooks/onboarding"],
+        examples=["https://hris.gmail.com/webhooks/onboarding"],
     )
     events: list[str] = Field(
         ...,
@@ -100,7 +100,7 @@ def _validate_events(events: list[str]) -> str | None:
 )
 async def create_webhook_config(
     body: WebhookConfigCreate,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/webhook-configs — dang ky URL moi."""
     try:
@@ -153,7 +153,7 @@ async def create_webhook_config(
 )
 async def list_webhook_configs(
     active_only: bool = Query(default=False, description="Chi lay configs dang active"),
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/webhook-configs — danh sach configs."""
     try:
@@ -182,7 +182,7 @@ async def list_webhook_configs(
 )
 async def get_webhook_config(
     config_id: str,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/webhook-configs/{config_id} — chi tiet config."""
     try:
@@ -237,7 +237,7 @@ async def get_webhook_config(
 async def update_webhook_config(
     config_id: str,
     body: WebhookConfigUpdate,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """PATCH /api/webhook-configs/{config_id} — cap nhat config."""
     try:
@@ -288,7 +288,7 @@ async def update_webhook_config(
 )
 async def delete_webhook_config(
     config_id: str,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """DELETE /api/webhook-configs/{config_id} — xoa config."""
     try:
@@ -321,7 +321,7 @@ async def delete_webhook_config(
 )
 async def test_webhook_config(
     config_id: str,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/webhook-configs/{config_id}/test — gui test payload."""
     try:

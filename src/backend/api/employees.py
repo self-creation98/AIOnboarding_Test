@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, EmailStr, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user, RequireRole
+from src.backend.api.deps import get_current_active_user
 from src.backend.schemas import UserInfo
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/employees", tags=["Employees"])
 class EmployeeCreate(BaseModel):
     """Body cho POST /api/employees."""
     full_name: str = Field(..., min_length=2, examples=["Nguyen Van A"])
-    email: EmailStr = Field(..., examples=["nguyen.van.a@company.com"])
+    email: EmailStr = Field(..., examples=["nguyen.van.a@gmail.com"])
     role: str = Field(..., examples=["Software Engineer"])
     department: str = Field(..., examples=["Engineering"])
     seniority: str = Field(default="junior", examples=["junior", "mid", "senior"])
@@ -108,7 +108,7 @@ def _err(msg: str, status_code: int = 400):
 )
 async def create_employee(
     body: EmployeeCreate,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/employees — tao nhan vien moi."""
     try:
@@ -140,32 +140,7 @@ async def create_employee(
             return _err("Insert failed — no data returned")
 
         emp = result.data[0]
-
-        # Auto-insert preboarding_documents cho NV mới
-        preboarding_docs = [
-            {"document_type": "cmnd", "document_label": "CMND/CCCD (mặt trước + mặt sau)"},
-            {"document_type": "photo_3x4", "document_label": "Ảnh thẻ 3x4"},
-            {"document_type": "so_bhxh", "document_label": "Sổ BHXH (nếu có)"},
-            {"document_type": "bang_cap", "document_label": "Bằng đại học / cao đẳng"},
-            {"document_type": "so_tai_khoan", "document_label": "Số tài khoản ngân hàng"},
-        ]
-
-        docs_to_insert = [
-            {
-                "employee_id": emp["id"],
-                "document_type": doc["document_type"],
-                "document_label": doc["document_label"],
-                "status": "missing",
-            }
-            for doc in preboarding_docs
-        ]
-        supabase.table("preboarding_documents").insert(docs_to_insert).execute()
-
-        return _ok({
-            "id": emp["id"],
-            "employee_code": emp["employee_code"],
-            "preboarding_docs_created": len(docs_to_insert),
-        })
+        return _ok({"id": emp["id"], "employee_code": emp["employee_code"]})
 
     except Exception as e:
         logger.error(f"Create employee error: {e}")
@@ -182,7 +157,7 @@ async def list_employees(
     department: str | None = Query(default=None, description="Filter theo department"),
     onboarding_status: str | None = Query(default=None, description="Filter: pre_boarding | in_progress | completed | terminated"),
     health_score: str | None = Query(default=None, description="Filter: green | yellow | red"),
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/employees — danh sach co filter."""
     try:
@@ -244,12 +219,6 @@ async def get_employee(
     current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/employees/{id} — chi tiet + checklist + documents."""
-    if current_user.vai_tro == "nhan_vien_moi" and current_user.id != employee_id:
-        from fastapi import HTTPException, status
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Bạn chỉ được xem thông tin của chính mình"
-        )
     try:
         supabase = get_supabase()
 
@@ -312,7 +281,7 @@ async def get_employee(
 async def update_employee(
     employee_id: str,
     body: EmployeeUpdate,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """PATCH /api/employees/{id} — partial update."""
     try:
@@ -349,7 +318,7 @@ async def update_employee(
 )
 async def delete_employee(
     employee_id: str,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """DELETE /api/employees/{id} — soft delete."""
     try:

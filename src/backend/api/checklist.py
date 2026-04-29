@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user, RequireRole
+from src.backend.api.deps import get_current_active_user
 from src.backend.schemas import UserInfo
 from src.backend.services.event_dispatcher import fire_event
 from src.backend.services.stakeholder_notifier import notify_stakeholders
@@ -168,7 +168,7 @@ def _build_checklist(role: str, department: str, seniority: str) -> list[dict]:
 )
 async def generate_checklist(
     body: GenerateRequest,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/checklist/generate — tao checklist 3-layer."""
     try:
@@ -299,10 +299,6 @@ async def get_plan(
 
         plan = plan_result.data[0]
 
-        if current_user.vai_tro == "nhan_vien_moi" and current_user.id != plan["employee_id"]:
-            from fastapi import HTTPException, status
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-
         # Items
         items_result = (
             supabase.table("checklist_items")
@@ -335,7 +331,7 @@ async def get_plan(
 async def approve_plan(
     plan_id: str,
     body: ApproveRequest,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/checklist/{plan_id}/approve — duyet plan."""
     try:
@@ -365,103 +361,59 @@ async def approve_plan(
                 "updated_at": datetime.now().isoformat(),
             }).eq("id", employee_id).execute()
 
-        # ─── Tạo stakeholder_tasks ───
+            # Gửi Slack thông báo cho IT/Admin chuẩn bị
+            try:
+                from src.slack_bot import notifications as slack
 
-        # Lấy employee info cho context
-        emp_result = (
-            supabase.table("employees")
-            .select("full_name, role, department, manager_id, start_date")
-            .eq("id", employee_id)
-            .limit(1)
-            .execute()
-        )
-        employee = emp_result.data[0] if emp_result.data else {}
+                emp_result = (
+                    supabase.table("employees")
+                    .select("full_name, role, department")
+                    .eq("id", employee_id)
+                    .limit(1)
+                    .execute()
+                )
+                if emp_result.data:
+                    emp = emp_result.data[0]
 
-        # Lấy checklist_items cần giao cho stakeholder (owner != 'new_hire')
-        items_result = (
-            supabase.table("checklist_items")
-            .select("id, title, description, owner, deadline_date")
-            .eq("plan_id", plan_id)
-            .neq("owner", "new_hire")
-            .execute()
-        )
-        stakeholder_items = items_result.data or []
+                    # Lấy stakeholder tasks để liệt kê việc cần làm
+                    it_items = (
+                        supabase.table("checklist_items")
+                        .select("title")
+                        .eq("plan_id", plan_id)
+                        .eq("owner", "it")
+                        .execute()
+                    )
+                    admin_items = (
+                        supabase.table("checklist_items")
+                        .select("title")
+                        .eq("plan_id", plan_id)
+                        .eq("owner", "admin")
+                        .execute()
+                    )
 
-        # Tạo tasks và đếm theo team
-        tasks_count = {"it": 0, "admin": 0, "manager": 0}
-        tasks_to_insert = []
-
-        for item in stakeholder_items:
-            owner = item["owner"]
-            if owner not in ("it", "admin", "manager"):
-                continue
-
-            task_data = {
-                "plan_id": plan_id,
-                "employee_id": employee_id,
-                "checklist_item_id": item["id"],
-                "assigned_to_team": owner,
-                "title": item["title"],
-                "description": item.get("description"),
-                "status": "pending",
-                "deadline": item.get("deadline_date"),
-                "details": {
-                    "employee_name": employee.get("full_name"),
-                    "role": employee.get("role"),
-                    "department": employee.get("department"),
-                },
-                "created_at": datetime.now().isoformat(),
-            }
-
-            # Nếu owner = 'manager' và có manager_id → giao cho manager cụ thể
-            if owner == "manager" and employee.get("manager_id"):
-                task_data["assigned_to_user_id"] = employee["manager_id"]
-
-            tasks_to_insert.append(task_data)
-            tasks_count[owner] += 1
-
-        if tasks_to_insert:
-            supabase.table("stakeholder_tasks").insert(tasks_to_insert).execute()
-
-        # ─── Fire outgoing webhook events ───
-        await fire_event("employee.onboarding.started", {
-            "employee_id": employee_id,
-            "plan_id": plan_id,
-            "employee_name": employee.get("full_name"),
-            "role": employee.get("role"),
-            "department": employee.get("department"),
-            "start_date": str(employee.get("start_date", "")),
-        })
-
-        if tasks_to_insert:
-            await fire_event("employee.task.assigned_to_stakeholder", {
-                "employee_id": employee_id,
-                "plan_id": plan_id,
-                "employee_name": employee.get("full_name"),
-                "tasks_created": tasks_count,
-            })
-
-        # ─── Gửi email thông báo cho stakeholders ───
-        email_results = {}
-        if tasks_to_insert:
-            email_results = await notify_stakeholders(
-                plan_id=plan_id,
-                employee_info={
-                    "id": employee_id,
-                    "full_name": employee.get("full_name"),
-                    "role": employee.get("role"),
-                    "department": employee.get("department"),
-                    "start_date": employee.get("start_date"),
-                    "manager_id": employee.get("manager_id"),
-                },
-            )
+                    if it_items.data:
+                        slack.send_stakeholder_notification(
+                            channel="#it-support",
+                            employee_name=emp.get("full_name", ""),
+                            role=emp.get("role", ""),
+                            department=emp.get("department", ""),
+                            tasks=[i["title"] for i in it_items.data],
+                        )
+                    if admin_items.data:
+                        slack.send_stakeholder_notification(
+                            channel="#admin",
+                            employee_name=emp.get("full_name", ""),
+                            role=emp.get("role", ""),
+                            department=emp.get("department", ""),
+                            tasks=[i["title"] for i in admin_items.data],
+                        )
+            except Exception as e:
+                logger.warning(f"Slack stakeholder notification failed: {e}")
 
         return _ok({
             "plan_id": plan_id,
             "status": "da_duyet",
             "approved_at": plan_result.data[0].get("approved_at"),
-            "stakeholder_tasks_created": tasks_count,
-            "stakeholder_emails": email_results,
         })
 
     except Exception as e:
@@ -584,9 +536,6 @@ async def get_employee_checklist(
     current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/employees/{employee_id}/checklist — checklist theo employee."""
-    if current_user.vai_tro == "nhan_vien_moi" and current_user.id != employee_id:
-        from fastapi import HTTPException, status
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     try:
         supabase = get_supabase()
 
@@ -636,7 +585,7 @@ async def get_employee_checklist(
 )
 async def delete_plan(
     plan_id: str,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """DELETE /api/checklist/{plan_id} — xoa plan + items."""
     try:

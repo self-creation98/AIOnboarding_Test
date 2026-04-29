@@ -12,7 +12,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 class LoginRequest(BaseModel):
     """Schema cho request đăng nhập."""
-    email: EmailStr = Field(..., examples=["nguyen.van.a@company.com"])
+    email: EmailStr = Field(..., examples=["nguyen.van.a@gmail.com"])
     password: str = Field(..., min_length=6, examples=["securepassword123"])
 
 

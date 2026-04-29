@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from src.backend.database import get_supabase
-from src.backend.api.deps import get_current_active_user, RequireRole
+from src.backend.api.deps import get_current_active_user
 from src.backend.schemas import UserInfo
 from src.backend.services.event_dispatcher import fire_event
 
@@ -49,7 +49,7 @@ def _err(msg: str, status_code: int = 400):
 
 
 @router.get("/overview", summary="Tong quan HR dashboard")
-async def overview(current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"]))):
+async def overview(current_user: UserInfo = Depends(get_current_active_user)):
     """GET /api/analytics/overview"""
     try:
         supabase = get_supabase()
@@ -114,7 +114,7 @@ async def overview(current_user: UserInfo = Depends(RequireRole(["hr_admin", "qu
 async def bottlenecks(
     min_affected: int = Query(default=2),
     department: str | None = Query(default=None),
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/analytics/bottlenecks"""
     try:
@@ -177,7 +177,7 @@ async def bottlenecks(
 
 
 @router.get("/content-gaps", summary="Content gap detection")
-async def content_gaps(current_user: UserInfo = Depends(RequireRole(["hr_admin"]))):
+async def content_gaps(current_user: UserInfo = Depends(get_current_active_user)):
     """GET /api/analytics/content-gaps"""
     try:
         supabase = get_supabase()
@@ -218,7 +218,7 @@ async def content_gaps(current_user: UserInfo = Depends(RequireRole(["hr_admin"]
 
 
 @router.get("/chatbot-stats", summary="Thong ke chatbot")
-async def chatbot_stats(current_user: UserInfo = Depends(RequireRole(["hr_admin"]))):
+async def chatbot_stats(current_user: UserInfo = Depends(get_current_active_user)):
     """GET /api/analytics/chatbot-stats"""
     try:
         supabase = get_supabase()
@@ -256,7 +256,7 @@ async def chatbot_stats(current_user: UserInfo = Depends(RequireRole(["hr_admin"
 @router.get("/employee/{employee_id}", summary="Tong hop data 1 NV")
 async def employee_analytics(
     employee_id: str,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """GET /api/analytics/employee/{employee_id}"""
     try:
@@ -361,7 +361,7 @@ async def employee_analytics(
 @router.post("/copilot", summary="AI Copilot tom tat")
 async def copilot_summary(
     body: CopilotRequest,
-    current_user: UserInfo = Depends(RequireRole(["hr_admin", "quan_ly"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/analytics/copilot — rule-based copilot (TODO: noi AI)."""
     try:
@@ -404,22 +404,12 @@ async def copilot_summary(
             .eq("status", "missing").execute())
         missing_docs = len(pb_res.data or [])
 
-        # ─── AI Copilot (fallback to rule-based) ───
+        # ============================================
+        # TODO: Nối Agent ML tại đây
+        # result = await copilot_summarize(employee_data)
+        # ============================================
         risk_factors = []
         suggested_actions = []
-        ai_summary = None
-        try:
-            from src.agent.interface import copilot_analyze
-            ai_result = await copilot_analyze(eid)
-            if ai_result.get("summary"):
-                ai_summary = ai_result["summary"]
-                risk_factors = ai_result.get("risk_factors", [])
-                suggested_actions = [
-                    {"type": s.get("type", ""), "label": s.get("label", ""), "target": s.get("target", "")}
-                    for s in ai_result.get("suggestions", [])
-                ]
-        except Exception as ai_err:
-            logger.warning(f"AI copilot fallback to rule-based: {ai_err}")
 
         if overdue > 0:
             risk_factors.append(f"{overdue} nhiệm vụ quá hạn")
@@ -439,9 +429,7 @@ async def copilot_summary(
         risk_count = len(risk_factors)
         priority = "low" if risk_count == 0 else ("medium" if risk_count <= 2 else "high")
 
-        if ai_summary:
-            summary = ai_summary
-        elif risk_factors:
+        if risk_factors:
             summary = f"NV {employee['full_name']} cần chú ý: {'; '.join(risk_factors)}."
         else:
             summary = f"NV {employee['full_name']} đang onboard bình thường, không có vấn đề."
@@ -450,7 +438,7 @@ async def copilot_summary(
             "employee_id": eid, "employee_name": employee["full_name"],
             "summary": summary, "risk_factors": risk_factors,
             "suggested_actions": suggested_actions,
-            "priority": priority, "data_source": "ai_powered" if ai_summary else "rule_based",
+            "priority": priority, "data_source": "rule_based",
         })
     except Exception as e:
         logger.error(f"Copilot error: {e}")
@@ -459,7 +447,7 @@ async def copilot_summary(
 
 @router.post("/recalculate-health", summary="Tinh lai health_score")
 async def recalculate_health(
-    current_user: UserInfo = Depends(RequireRole(["hr_admin"])),
+    current_user: UserInfo = Depends(get_current_active_user),
 ):
     """POST /api/analytics/recalculate-health"""
     try:
@@ -545,6 +533,31 @@ async def recalculate_health(
                     "previous_score": old_score,
                     "trigger": "health_recalculation",
                 })
+
+                # Gửi Slack risk alert cho HR
+                try:
+                    from src.slack_bot import notifications as slack
+
+                    emp_name_res = (
+                        supabase.table("employees")
+                        .select("full_name")
+                        .eq("id", eid)
+                        .limit(1)
+                        .execute()
+                    )
+                    emp_name = emp_name_res.data[0]["full_name"] if emp_name_res.data else eid
+
+                    risk_factors = []
+                    if overdue >= 3:
+                        risk_factors.append(f"{overdue} tasks quá hạn")
+                    if days_inactive >= 5:
+                        risk_factors.append(f"Không hoạt động {days_inactive} ngày")
+                    if sentiment in ("frustrated", "negative"):
+                        risk_factors.append(f"Sentiment: {sentiment}")
+
+                    slack.send_risk_alert(emp_name, risk_factors)
+                except Exception as e:
+                    logger.warning(f"Slack risk alert failed for {eid}: {e}")
 
             counts[score] += 1
 
