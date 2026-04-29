@@ -2,7 +2,10 @@ FROM nikolaik/python-nodejs:python3.11-nodejs20-slim
 
 WORKDIR /app
 
-# Install Python dependencies
+# Install CPU-only PyTorch first (Railway has no GPU — skip ~2.5GB of CUDA libs)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install remaining Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
